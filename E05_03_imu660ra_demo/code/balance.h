@@ -25,8 +25,8 @@
 #define Speed2angle                     1
 
 // 有刷 无刷单独调试
-#define TURN_ENABLE                     0
-#define MAIN_ENABLE                     1
+#define TURN_ENABLE                     1
+#define MAIN_ENABLE                     0
 
 // 串口调试方式
 #define CURVE_OUT                       1

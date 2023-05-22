@@ -122,7 +122,8 @@ void balance( void )
     // 根据重力加速度解算 Y Z 偏航角，以竖直状态为0
     angle_x = (float)(asinf((float)(func_limit_ab(accXArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
     angle_y = (float)(asinf((float)(func_limit_ab(accYArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
-    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
+//    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
+    angle_z = accZArray_avge[10] / 2 / PI * 360;
 
 
     // angle speed -----------------------------------------内环------------------------------------------------- //
@@ -143,7 +144,7 @@ void balance( void )
     duty_out_gyro = func_limit_ab(duty_out_gyro, -8500, 8500);
 
     // roll 轴 —— Z 轴 角速度环
-    if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 8)
+    if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 8 * 2)
     {
        err_gyro_z = 10 * (angleSpeedZ_set - gyroZArray_avge[10]);
     }
@@ -152,8 +153,8 @@ void balance( void )
 //       duty_out_MAIN_gyro *= 0.4;
        err_gyro_z = 0;
     }
-    duty_out_MAIN_gyro = err_gyro_z * 1.3;
-    duty_out_MAIN_gyro += (err_gyro_z - lastErr_M_gyro) * 0.7;
+    duty_out_MAIN_gyro = err_gyro_z * 4;//1.3;
+    duty_out_MAIN_gyro -= (err_gyro_z - lastErr_M_gyro) * 2.5;//1.5;//0.7
     lastErr_M_gyro = err_gyro_z;
 
     duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -2500, 2500);
@@ -229,29 +230,28 @@ void balance( void )
         duty_out_MAIN = 0;
         goto Dumping_protection;
     }
-    duty_out_MAIN_acc = err_acc_y * 2;// 5
+    duty_out_MAIN_acc = err_acc_y * 300;// 5
 //        duty_out_MAIN_acc -= (err_acc_y - lastErr_M_acc) * 0.5;
 //    if(func_abs(10 * err_acc_y) < 55)
 //    {
-    duty_out_MAIN_acc = 0;
-           integError_y += err_acc_y * -0.8;
-           duty_out_MAIN_acc += integError_y;
+           integError_y += err_acc_y * 8;
+//           duty_out_MAIN_acc += integError_y;
 //    }
 //    else
-       integError_y *= 0.9;
+//       integError_y *= 0.9;
 
-    integError_y = func_limit_ab(integError_y, -13, 13);
+    integError_y = func_limit_ab(integError_y, -800, 800);
     lastErr_M_acc = err_acc_y;
-    duty_out_MAIN_acc = func_limit_ab(duty_out_MAIN_acc, -200, 200);
-    angleSpeedZ_set = duty_out_MAIN_acc;
+    duty_out_MAIN_acc = func_limit_ab(duty_out_MAIN_acc, -200 * 10, 200 * 10);
+//    angleSpeedZ_set = + duty_out_MAIN_acc;
 #else
 #endif
 
 
     // speed to angle ---------------------------------------外外环------------------------------------------------ //
 #if     Speed2angle
-    sum_Speed_Lef = (Speed_Lef_set - SpeedLef_avge[5]) * func_abs(angle_z) * 0.04;//0.15;
-    sum_Speed_Rig = (Speed_Rig_set + SpeedRig_avge[5]) * func_abs(angle_z) * 0.04;//0.15;
+    sum_Speed_Lef = (Speed_Lef_set - SpeedLef_avge[5]) * func_abs(angle_z) * 0.06;//0.15;
+    sum_Speed_Rig = (Speed_Rig_set + SpeedRig_avge[5]) * func_abs(angle_z) * 0.06;//0.15;
     sum_Speed_Turn = (sum_Speed_Lef + sum_Speed_Rig) / 2;
     sum_Speed_Turn = func_limit_ab(sum_Speed_Turn, -30, 30);
 //        sum_Speed_MAIN = (Speed_MAIN_set + real_Speed_MAIN) * 1;
@@ -269,7 +269,7 @@ void balance( void )
 
 //        duty_out_MAIN = - duty_out_MAIN_acc - duty_out_MAIN_gyro;
     duty_out_MAIN = - duty_out_MAIN_gyro;
-    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -2500, 2500);
+    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -1500, 1500);
     Dumping_protection:
     duty_out_Lef = duty_out + duty_out_turn;
     duty_out_Rig = duty_out - duty_out_turn;
@@ -332,10 +332,10 @@ void balance( void )
 
 #if     CURVE_OUT
     numTest[2] = - real_Speed_Lef;
-    numTest[3] = sum_Speed_Rig;
+    numTest[3] = real_Speed_MAIN / 7.5;
     numTest[4] = duty_out * 100 / 8000;
     numTest[5] = duty_out_MAIN * 100 / 2000;
-    numTest[6] = sum_Speed_Lef;
+    numTest[6] = angle_y;
     numTest[7] = real_Speed_Rig;
 
 //        printf("%c%c%c%c%c", 0x03, 0x0FC, numTest, 0x0FC, 0x03);
