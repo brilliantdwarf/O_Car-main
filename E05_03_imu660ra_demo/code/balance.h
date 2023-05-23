@@ -52,7 +52,6 @@ extern float SpeedLef_avge[6];
 extern int16 SpeedLef_avgeIndex;
 extern float SpeedRig_avge[6];
 extern int16 SpeedRig_avgeIndex;
-extern int8 numTest[10];
 
 extern float angleX_set;
 extern float angleY_set;
@@ -79,7 +78,10 @@ extern int16 real_Speed_MAIN;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void balance( void );
-
+static void dataAveraging       ( void );
+static void debugOutput         ( void );
+       void balance             ( void );
+       void balance2            ( void );
+       void balance3            ( void );
 
 #endif /* CODE_BALANCE_H_ */

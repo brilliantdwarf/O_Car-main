@@ -92,9 +92,13 @@ static int8 numTest[10] = {0x03, 0xFC, 0, 0, 0, 0, 0, 0, 0xFC, 0x03};
 /*--------------------------------------------------Function Content-------------------------------------------------*/
 /*********************************************************************************************************************/
 
-void balance( void )
-{
+/*
+ * Description
+ * 用于对陀螺仪数据进行平均值平滑处理
+ */
 
+static void dataAveraging( void )
+{
     // 陀螺仪取值平滑处理
     for(int8 i = 0; i < 10; i++)
     {
@@ -122,13 +126,58 @@ void balance( void )
     // 根据重力加速度解算 Y Z 偏航角，以竖直状态为0
     angle_x = (float)(asinf((float)(func_limit_ab(accXArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
     angle_y = (float)(asinf((float)(func_limit_ab(accYArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
-//    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
-    angle_z = accZArray_avge[10] / 2 / PI * 360;
+    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
+//    angle_z = accZArray_avge[10] / 2 / PI * 360;
 
+}
+
+
+/*
+ * Description
+ * 本函数用于调试各项数据，可将数值直接打印在屏幕上或者以曲线形式展现，在宏定义中可更改调试方式
+ */
+
+static void debugOutput( void )
+{
+#if     CURVE_OUT
+    numTest[2] = - gyroYArray_avge[10];
+    numTest[3] = aSpeed_out_BALANCE_acc *100 / 5500;
+    numTest[4] = duty_out * 100 / 8000;
+    numTest[5] = duty_out_MAIN * 100 / 2000;
+    numTest[6] = angle_y;
+    numTest[7] = gyroYArray_avge[10];
+
+//        printf("%c%c%c%c%c", 0x03, 0x0FC, numTest, 0x0FC, 0x03);
+    uart_write_buffer(UART_0, numTest, 10);
+//        uart_write_buffer(UART_2, numTest, 10);
+
+#elif   CHARACTER_OUT
+
+//        printf("\r\n org IMU660RA acc data:  x=%.2f, y=%.2f, z=%.2f\r\n", realGYRO_x,  realGYRO_y,  realGYRO_z);
+//        printf("\r\n org IMU660RA gyro data: x=%.0f, y=%.0f, z=%.0f, duty=%d\r\n", 1000 * imu660ra_acc_transition(imu660ra_acc_x), 1000 * imu660ra_acc_transition(imu660ra_acc_y), 1000 * imu660ra_acc_transition(imu660ra_acc_z), duty_out);
+    printf("\r\n  sum_Speed_Turn=%4.4f, z_s=%4.4f, Y_a=%4.4f, duty=%4.4f\r\n", sum_Speed_Turn, SpeedLef_avge[5], SpeedRig_avge[5], duty_out);
+    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", angle_x, angle_y, angle_z);
+
+//        printf("\r\n%5d\r\n", maxAcc_y);
+//        printf("\r\n real IMU660RA acc data:  x=%5d, y=%5d, z=%5d\r\n", imu660ra_acc_x,  imu660ra_acc_y,  imu660ra_acc_z);
+//        printf("\r\n real IMU660RA gyro data: x=%5d, y=%5d, z=%5d\r\n", imu660ra_gyro_x, imu660ra_gyro_y, imu660ra_gyro_z);
+
+#endif
+}
+
+/*
+ * Description
+ * 采用三级串行PID算法，从内到外依此是角速度->角度->飞轮速度，最外环为正反馈
+ * Inspiration from ZF
+ */
+void balance( void )
+{
+    // 数据预处理
+    dataAveraging();
 
     // angle speed -----------------------------------------内环------------------------------------------------- //
 #if     aS2out
-    // pitch 轴 —— Y 轴 角速度环
+    // pitch 轴 —— Y 轴 角速度环 -------------------------------------------------------------------------------- //
     if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 8)
     {
        err_gyro_y = 10 * (angleSpeedY_set - gyroYArray_avge[10]);
@@ -143,7 +192,7 @@ void balance( void )
     lastErr_gyro = err_gyro_y;
     duty_out_gyro = func_limit_ab(duty_out_gyro, -8500, 8500);
 
-    // roll 轴 —— Z 轴 角速度环
+    // roll 轴 —— Z 轴 角速度环 -------------------------------------------------------------------------------- //
     if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 8 * 2)
     {
        err_gyro_z = 10 * (angleSpeedZ_set - gyroZArray_avge[10]);
@@ -159,28 +208,28 @@ void balance( void )
 
     duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -2500, 2500);
 
-//        // yaw 轴 —— X 轴 角速度环
-//        if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
-//        {
-//            err_gyro_x = 10 * (angleSpeedX_set - gyroXArray_avge[10]);
-//        }
-//        else
-//        {
-//           err_gyro_x = 0;
-//        }
-//        duty_out_turn = err_gyro_x * 1;
-//        duty_out_turn += (err_gyro_x - lastErr_Turn) * 1.5;
-//
-//        lastErr_Turn = err_gyro_x;
-//
-//        duty_out_turn = func_limit_ab(duty_out_turn, -1000, 1000);
+    //    // yaw 轴 —— X 轴 角速度环 -------------------------------------------------------------------------------- //
+    //    if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
+    //    {
+    //        err_gyro_x = 10 * (angleSpeedX_set - gyroXArray_avge[10]);
+    //    }
+    //    else
+    //    {
+    //       err_gyro_x = 0;
+    //    }
+    //    duty_out_turn = err_gyro_x * 1;
+    //    duty_out_turn += (err_gyro_x - lastErr_Turn) * 1.5;
+    //
+    //    lastErr_Turn = err_gyro_x;
+    //
+    //    duty_out_turn = func_limit_ab(duty_out_turn, -1000, 1000);
 #else
 #endif
 
 
     // angle to angle speed------------------------------------外环------------------------------------------------ //
 #if     angle2aSpeed
-    // Z 方向偏航角 用 Y 方向角速度弥补 角度环
+    // Z 方向偏航角 用 Y 方向角速度弥补 角度环 --------------------------------------------------------------------- //
 //        angle_z = 0;
     if(func_abs(10 * (angleZ_set - 6 * angle_z)) > 5 * 6)
     {
@@ -214,7 +263,7 @@ void balance( void )
 
     angleSpeedY_set = - aSpeed_out_BALANCE_acc;
 
-    // Y 方向偏航角 用 Z 方向角速度弥补 角度环
+    // Y 方向偏航角 用 Z 方向角速度弥补 角度环 ---------------------------------------------------------------------- //
     if(func_abs(10 * (angleY_set - angle_y)) > 2)
     {
        err_acc_y = angleY_set - angle_y;
@@ -248,7 +297,7 @@ void balance( void )
 #endif
 
 
-    // speed to angle ---------------------------------------外外环------------------------------------------------ //
+    // speed to angle ---------------------------------------外外环------------------------------------------------- //
 #if     Speed2angle
     sum_Speed_Lef = (Speed_Lef_set - SpeedLef_avge[5]) * func_abs(angle_z) * 0.06;//0.15;
     sum_Speed_Rig = (Speed_Rig_set + SpeedRig_avge[5]) * func_abs(angle_z) * 0.06;//0.15;
@@ -319,40 +368,346 @@ void balance( void )
 //            pwm_set_duty(LEFT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
 //            pwm_set_duty(RIGHT_FLYWHEEL_PWM, PWM_DUTY_MAX - func_abs(duty_out));
 //        }
-    if(duty_out_MAIN >= 0)                                                  // 正转
+    if(duty_out_MAIN >= 0)                                                          // 正转
     {
-        gpio_set_level(POWER_MOTOR_DIR, GPIO_HIGH);                                     // DIR输出高电平
-        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);                         // 计算占空比
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_HIGH);                                 // DIR输出高电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);               // 计算占空比
     }
-    else                                                                    // 反转
+    else                                                                            // 反转
     {
-        gpio_set_level(POWER_MOTOR_DIR, GPIO_LOW);                                      // DIR输出低电平
-        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);                         // 计算占空比
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_LOW);                                  // DIR输出低电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);               // 计算占空比
     }
 
-#if     CURVE_OUT
-    numTest[2] = - real_Speed_Lef;
-    numTest[3] = real_Speed_MAIN / 7.5;
-    numTest[4] = duty_out * 100 / 8000;
-    numTest[5] = duty_out_MAIN * 100 / 2000;
-    numTest[6] = angle_y;
-    numTest[7] = real_Speed_Rig;
+    // 调试串口输出
+    debugOutput();
+}
 
-//        printf("%c%c%c%c%c", 0x03, 0x0FC, numTest, 0x0FC, 0x03);
-    uart_write_buffer(UART_0, numTest, 10);
-//        uart_write_buffer(UART_2, numTest, 10);
 
-#elif   CHARACTER_OUT
+/*
+ * Description
+ * 本函数用于实现第二种平衡原理，采用两级串行PID算法，由内到外依此角速度->角度，与balance不同的是，将角度以累加求目标角速度的方式传给角速度环，从而在没有
+ * 正反馈飞轮速度环的情况下实现力矩的输出。角速度环为位置式PID，角度环为增量式PID
+ * Inspiration from WYT
+ */
 
-//        printf("\r\n org IMU660RA acc data:  x=%.2f, y=%.2f, z=%.2f\r\n", realGYRO_x,  realGYRO_y,  realGYRO_z);
-//        printf("\r\n org IMU660RA gyro data: x=%.0f, y=%.0f, z=%.0f, duty=%d\r\n", 1000 * imu660ra_acc_transition(imu660ra_acc_x), 1000 * imu660ra_acc_transition(imu660ra_acc_y), 1000 * imu660ra_acc_transition(imu660ra_acc_z), duty_out);
-    printf("\r\n  sum_Speed_Turn=%4.4f, z_s=%4.4f, Y_a=%4.4f, duty=%4.4f\r\n", sum_Speed_Turn, SpeedLef_avge[5], SpeedRig_avge[5], duty_out);
-    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", angle_x, angle_y, angle_z);
+void balance2( void )
+{
+    // 数据预处理
+    dataAveraging();
 
-//        printf("\r\n%5d\r\n", maxAcc_y);
-//        printf("\r\n real IMU660RA acc data:  x=%5d, y=%5d, z=%5d\r\n", imu660ra_acc_x,  imu660ra_acc_y,  imu660ra_acc_z);
-//        printf("\r\n real IMU660RA gyro data: x=%5d, y=%5d, z=%5d\r\n", imu660ra_gyro_x, imu660ra_gyro_y, imu660ra_gyro_z);
+    // angle speed -----------------------------------------内环------------------------------------------------- //
+#if     aS2out
+    // pitch 轴 —— Y 轴 角速度环 -------------------------------------------------------------------------------- //
+    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 0)
+    {
+       err_gyro_y = 10 * (angleSpeedY_set - gyroYArray_avge[10]);
+    }
+    else
+    {
+//           duty_out_gyro *= 0.5;
+       err_gyro_y = 0;
+    }
+    duty_out_gyro = err_gyro_y * 20;//28;
+    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 2;                   // 正负决定瞬时对于kp是补偿还是削弱
+    lastErr_gyro = err_gyro_y;
+    duty_out_gyro = func_limit_ab(duty_out_gyro, -8500, 8500);
 
+    // roll 轴 —— Z 轴 角速度环 -------------------------------------------------------------------------------- //
+    if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 8 * 2)
+    {
+       err_gyro_z = 10 * (angleSpeedZ_set - gyroZArray_avge[10]);
+    }
+    else
+    {
+//       duty_out_MAIN_gyro *= 0.4;
+       err_gyro_z = 0;
+    }
+    duty_out_MAIN_gyro = err_gyro_z * 4;//1.3;
+    duty_out_MAIN_gyro -= (err_gyro_z - lastErr_M_gyro) * 2.5;//1.5;//0.7
+    lastErr_M_gyro = err_gyro_z;
+
+    duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -2500, 2500);
+
+//    // yaw 轴 —— X 轴 角速度环 -------------------------------------------------------------------------------- //
+//    if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
+//    {
+//        err_gyro_x = 10 * (angleSpeedX_set - gyroXArray_avge[10]);
+//    }
+//    else
+//    {
+//       err_gyro_x = 0;
+//    }
+//    duty_out_turn = err_gyro_x * 1;
+//    duty_out_turn += (err_gyro_x - lastErr_Turn) * 1.5;
+//
+//    lastErr_Turn = err_gyro_x;
+//
+//    duty_out_turn = func_limit_ab(duty_out_turn, -1000, 1000);
+#else
 #endif
+
+
+    // angle to angle speed------------------------------------外环------------------------------------------------ //
+#if     angle2aSpeed
+    // Z 方向偏航角 用 Y 方向角速度弥补 角度环 --------------------------------------------------------------------- //
+//        angle_z = 0;
+    if(func_abs(10 * (angleZ_set - 6 * angle_z)) > 0)
+    {
+       err_acc_z = angleZ_set - angle_z;
+    }
+    else
+    {
+//           duty_out_acc *= 0.8;
+       err_acc_z = 0;
+    }
+    if(func_abs(angle_z) > 20)
+    {
+        duty_out = 0;
+        goto Dumping_protection;
+    }
+    aSpeed_out_BALANCE_acc += err_acc_z * 2.5;//2.5;// 3
+//    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1;
+
+//    if(func_abs(10 * err_acc_z) < 55)
+//    {
+       integError_z += err_acc_z * 0.12;
+//       aSpeed_out_BALANCE_acc += integError_z;
+//    }
+//    else
+//       integError_z *= 0.9;
+
+    integError_z = func_limit_ab(integError_z, -12, 12);
+    lastErr_acc = err_acc_z;
+
+    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -25, 25);
+
+    angleSpeedY_set = - aSpeed_out_BALANCE_acc;
+
+    // Y 方向偏航角 用 Z 方向角速度弥补 角度环 ---------------------------------------------------------------------- //
+    if(func_abs(10 * (angleY_set - angle_y)) > 2)
+    {
+       err_acc_y = angleY_set - angle_y;
+    }
+    else
+    {
+//           aSpeed_out_BALANCE_acc *= 0.8;
+       err_acc_y = 0;
+    }
+    if(func_abs(angle_y) > 30)
+    {
+        duty_out = 0;
+        duty_out_MAIN = 0;
+        goto Dumping_protection;
+    }
+    duty_out_MAIN_acc = err_acc_y * 300;// 5
+//        duty_out_MAIN_acc -= (err_acc_y - lastErr_M_acc) * 0.5;
+//    if(func_abs(10 * err_acc_y) < 55)
+//    {
+           integError_y += err_acc_y * 8;
+//           duty_out_MAIN_acc += integError_y;
+//    }
+//    else
+//       integError_y *= 0.9;
+
+    integError_y = func_limit_ab(integError_y, -800, 800);
+    lastErr_M_acc = err_acc_y;
+    duty_out_MAIN_acc = func_limit_ab(duty_out_MAIN_acc, -200 * 10, 200 * 10);
+//    angleSpeedZ_set = + duty_out_MAIN_acc;
+#else
+#endif
+
+    // 输出 和 限幅
+//        duty_out += (duty_out_gyro - aSpeed_out_BALANCE_acc);
+//        duty_out += duty_out_gyro;
+    duty_out = func_limit_ab(duty_out_gyro, -8500, 8500);
+
+//        duty_out_MAIN = - duty_out_MAIN_acc - duty_out_MAIN_gyro;
+    duty_out_MAIN = - duty_out_MAIN_gyro;
+    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -1500, 1500);
+    Dumping_protection:
+    duty_out_Lef = duty_out + duty_out_turn;
+    duty_out_Rig = duty_out - duty_out_turn;
+
+#if     !TURN_ENABLE
+    duty_out_Lef = 0;
+    duty_out_Rig = 0;
+#endif
+
+#if     !MAIN_ENABLE
+    duty_out_MAIN = 0;
+#endif
+
+    // PWM 输出
+    if(duty_out_Lef >= 0)
+    {
+        gpio_set_level(LEFT_FLYWHEEL_DIR, !LEFT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(LEFT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Lef));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    else
+    {
+        gpio_set_level(LEFT_FLYWHEEL_DIR, LEFT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(LEFT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Lef));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    if(duty_out_Rig >= 0)
+    {
+        gpio_set_level(RIGHT_FLYWHEEL_DIR, RIGHT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(RIGHT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Rig));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    else
+    {
+        gpio_set_level(RIGHT_FLYWHEEL_DIR, !RIGHT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(RIGHT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Rig));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    if(duty_out_MAIN >= 0)                                                         // 正转
+    {
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_HIGH);                                // DIR输出高电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);              // 计算占空比
+    }
+    else                                                                           // 反转
+    {
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_LOW);                                 // DIR输出低电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);              // 计算占空比
+    }
+
+    // 调试串口输出
+    debugOutput();
+}
+
+/*
+ * Description
+ * 本函数用于实现第三种平衡原理，采用两环并联型PID，分别为角速度环和角度环，角度环采用增量型PID、角速度环采用位置型PID对输出控制
+ * Inspiration from WYT
+ */
+
+void balance3( void )
+{
+    // 数据预处理
+    dataAveraging();
+
+    if(func_abs(angle_y) > 30)
+    {
+        duty_out = 0;
+        duty_out_MAIN = 0;
+        goto Dumping_protection;
+    }
+
+    // angle speed -----------------------------------------内环------------------------------------------------- //
+#if     aS2out
+    // pitch 轴 —— Y 轴 角速度环 -------------------------------------------------------------------------------- //
+    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 0)
+    {
+       err_gyro_y = 10 * (angleSpeedY_set - gyroYArray_avge[10]);
+    }
+    else
+    {
+//           duty_out_gyro *= 0.5;
+       err_gyro_y = 0;
+    }
+    duty_out_gyro = err_gyro_y * 10;//28;
+    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 2;                   // 正负决定瞬时对于kp是补偿还是削弱
+    lastErr_gyro = err_gyro_y;
+    duty_out_gyro = func_limit_ab(duty_out_gyro, -3500, 3500);
+
+
+#else
+#endif
+
+
+    // angle to angle speed------------------------------------外环------------------------------------------------ //
+#if     angle2aSpeed
+    // Z 方向偏航角 用 Y 方向角速度弥补 角度环 --------------------------------------------------------------------- //
+//        angle_z = 0;
+    if(func_abs(10 * (angleZ_set - 6 * angle_z)) > 0)
+    {
+       err_acc_z = angleZ_set - angle_z, 2;
+       err_acc_z *= pow(func_abs(err_acc_z), 2);
+    }
+    else
+    {
+//           duty_out_acc *= 0.8;
+       err_acc_z = 0;
+    }
+    if(func_abs(angle_z) > 20)
+    {
+        duty_out = 0;
+        goto Dumping_protection;
+    }
+    aSpeed_out_BALANCE_acc += err_acc_z * 1;//2.5;// 3
+//    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1;
+
+//    if(func_abs(10 * err_acc_z) < 55)
+//    {
+       integError_z += err_acc_z * 1;
+       aSpeed_out_BALANCE_acc += integError_z;
+//    }
+//    else
+//       integError_z *= 0.9;
+
+    integError_z = func_limit_ab(integError_z, -500, 500);
+    lastErr_acc = err_acc_z;
+
+    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -8500, 8500);
+
+    duty_out = duty_out_gyro;
+    duty_out -= aSpeed_out_BALANCE_acc;
+
+
+#else
+#endif
+
+    // 输出 和 限幅
+
+    duty_out = func_limit_ab(duty_out, -8500, 8500);
+
+    duty_out_MAIN = - duty_out_MAIN_gyro;
+    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -1500, 1500);
+    Dumping_protection:
+    duty_out_Lef = duty_out + duty_out_turn;
+    duty_out_Rig = duty_out - duty_out_turn;
+
+#if     !TURN_ENABLE
+    duty_out_Lef = 0;
+    duty_out_Rig = 0;
+#endif
+
+#if     !MAIN_ENABLE
+    duty_out_MAIN = 0;
+#endif
+
+    // PWM 输出
+    if(duty_out_Lef >= 0)
+    {
+        gpio_set_level(LEFT_FLYWHEEL_DIR, !LEFT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(LEFT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Lef));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    else
+    {
+        gpio_set_level(LEFT_FLYWHEEL_DIR, LEFT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(LEFT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Lef));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    if(duty_out_Rig >= 0)
+    {
+        gpio_set_level(RIGHT_FLYWHEEL_DIR, RIGHT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(RIGHT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Rig));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    else
+    {
+        gpio_set_level(RIGHT_FLYWHEEL_DIR, !RIGHT_FLYWHEEL_CLOCKWISE);
+        pwm_set_duty(RIGHT_FLYWHEEL_PWM,  PWM_DUTY_MAX - func_abs(duty_out_Rig));  // 输出占空比 占空比必须为正值 因此此处使用绝对值
+    }
+    if(duty_out_MAIN >= 0)                                                         // 正转
+    {
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_HIGH);                                // DIR输出高电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);              // 计算占空比
+    }
+    else                                                                           // 反转
+    {
+        gpio_set_level(POWER_MOTOR_DIR, GPIO_LOW);                                 // DIR输出低电平
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);              // 计算占空比
+    }
+
+    // 调试串口输出
+    debugOutput();
 }
 
