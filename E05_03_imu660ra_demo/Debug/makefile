@@ -151,7 +151,7 @@ main-build: E05_03_imu660ra_demo.elf secondary-outputs
 E05_03_imu660ra_demo.elf: $(OBJS) makefile objects.mk $(OPTIONAL_TOOL_DEPS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: TASKING Linker'
-	cctc -lrt -lfp_fpu -lcs_fpu  -Wl-Oc -Wl-OL -Wl-Ot -Wl-Ox -Wl-Oy "D:\AURIX-Studio-1.5.4\Workspace\E05_03_imu660ra_demo\libraries\zf_device\zf_device_config.a" -Wl--map-file="E05_03_imu660ra_demo.map" -Wl-mc -Wl-mf -Wl-mi -Wl-mk -Wl-ml -Wl-mm -Wl-md -Wl-mr -Wl-mu --no-warnings= -Wl--error-limit=42 --exceptions --strict --anachronisms --force-c++ -Ctc26xb   -o"E05_03_imu660ra_demo.elf" -Wl-o"E05_03_imu660ra_demo.hex:IHEX" --lsl-core=vtc  --lsl-file=../Lcf_Tasking_Tricore_Tc.lsl $(OBJS)
+	cctc -lrt -lfp_fpu -lcs_fpu  -Wl-Oc -Wl-OL -Wl-Ot -Wl-Ox -Wl-Oy "D:\AURIX-Studio-1.5.4\Workspace\O_Car-main\O_Car-main\E05_03_imu660ra_demo\libraries\zf_device\zf_device_config.a" -Wl--map-file="E05_03_imu660ra_demo.map" -Wl-mc -Wl-mf -Wl-mi -Wl-mk -Wl-ml -Wl-mm -Wl-md -Wl-mr -Wl-mu --no-warnings= -Wl--error-limit=42 --exceptions --strict --anachronisms --force-c++ -Ctc26xb   -o"E05_03_imu660ra_demo.elf" -Wl-o"E05_03_imu660ra_demo.hex:IHEX" --lsl-core=vtc  --lsl-file=../Lcf_Tasking_Tricore_Tc.lsl $(OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
