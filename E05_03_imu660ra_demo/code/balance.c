@@ -661,7 +661,7 @@ void balance3( void )
     duty_out = func_limit_ab(duty_out, -8500, 8500);
 
     duty_out_MAIN = - duty_out_MAIN_gyro;
-    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -1500, 1500);
+    duty_out_MAIN = func_limit_ab(duty_out_MAIN, -1700, 1700);
     Dumping_protection:
     duty_out_Lef = duty_out + duty_out_turn;
     duty_out_Rig = duty_out - duty_out_turn;
