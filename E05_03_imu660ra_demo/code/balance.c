@@ -141,7 +141,7 @@ static void debugOutput( void )
 {
 #if     CURVE_OUT
     numTest[2] = - gyroYArray_avge[10];
-    numTest[3] = aSpeed_out_BALANCE_acc *100 / 5500;
+    numTest[3] = aSpeed_out_BALANCE_acc / 6;
     numTest[4] = duty_out * 100 / 8000;
     numTest[5] = duty_out_MAIN * 100 / 2000;
     numTest[6] = angle_y;
@@ -155,10 +155,10 @@ static void debugOutput( void )
 
 //        printf("\r\n org IMU660RA acc data:  x=%.2f, y=%.2f, z=%.2f\r\n", realGYRO_x,  realGYRO_y,  realGYRO_z);
 //        printf("\r\n org IMU660RA gyro data: x=%.0f, y=%.0f, z=%.0f, duty=%d\r\n", 1000 * imu660ra_acc_transition(imu660ra_acc_x), 1000 * imu660ra_acc_transition(imu660ra_acc_y), 1000 * imu660ra_acc_transition(imu660ra_acc_z), duty_out);
-    printf("\r\n  sum_Speed_Turn=%4.4f, z_s=%4.4f, Y_a=%4.4f, duty=%4.4f\r\n", sum_Speed_Turn, SpeedLef_avge[5], SpeedRig_avge[5], duty_out);
-    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", angle_x, angle_y, angle_z);
+//    printf("\r\n  sum_Speed_Turn=%4.4f, z_s=%4.4f, Y_a=%4.4f, duty=%4.4f\r\n", sum_Speed_Turn, SpeedLef_avge[5], SpeedRig_avge[5], duty_out);
+//    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", angle_x, angle_y, angle_z);
 
-//        printf("\r\n%5d\r\n", maxAcc_y);
+    printf("\r\n%4.4f\r\n", aSpeed_out_BALANCE_acc);
 //        printf("\r\n real IMU660RA acc data:  x=%5d, y=%5d, z=%5d\r\n", imu660ra_acc_x,  imu660ra_acc_y,  imu660ra_acc_z);
 //        printf("\r\n real IMU660RA gyro data: x=%5d, y=%5d, z=%5d\r\n", imu660ra_gyro_x, imu660ra_gyro_y, imu660ra_gyro_z);
 
@@ -170,6 +170,7 @@ static void debugOutput( void )
  * 采用三级串行PID算法，从内到外依此是角速度->角度->飞轮速度，最外环为正反馈
  * Inspiration from ZF
  */
+
 void balance( void )
 {
     // 数据预处理
@@ -178,7 +179,7 @@ void balance( void )
     // angle speed -----------------------------------------内环------------------------------------------------- //
 #if     aS2out
     // pitch 轴 —— Y 轴 角速度环 -------------------------------------------------------------------------------- //
-    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 8)
+    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 1)
     {
        err_gyro_y = 10 * (angleSpeedY_set - gyroYArray_avge[10]);
     }
@@ -188,12 +189,12 @@ void balance( void )
        err_gyro_y = 0;
     }
     duty_out_gyro = err_gyro_y * 30;//28;
-    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 2;                   // 正负决定瞬时对于kp是补偿还是削弱
+    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 10;                   // 正负决定瞬时对于kp是补偿还是削弱
     lastErr_gyro = err_gyro_y;
     duty_out_gyro = func_limit_ab(duty_out_gyro, -8500, 8500);
 
     // roll 轴 —— Z 轴 角速度环 -------------------------------------------------------------------------------- //
-    if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 8 * 2)
+    if(func_abs((int)(10 * (angleSpeedZ_set - gyroZArray_avge[10]))) > 0)
     {
        err_gyro_z = 10 * (angleSpeedZ_set - gyroZArray_avge[10]);
     }
@@ -202,27 +203,27 @@ void balance( void )
 //       duty_out_MAIN_gyro *= 0.4;
        err_gyro_z = 0;
     }
-    duty_out_MAIN_gyro = err_gyro_z * 4;//1.3;
-    duty_out_MAIN_gyro -= (err_gyro_z - lastErr_M_gyro) * 2.5;//1.5;//0.7
+    duty_out_MAIN_gyro = err_gyro_z * 2;//1.3;
+//    duty_out_MAIN_gyro -= (err_gyro_z - lastErr_M_gyro) * 2.5;//1.5;//0.7
     lastErr_M_gyro = err_gyro_z;
 
     duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -2500, 2500);
 
-    //    // yaw 轴 —— X 轴 角速度环 -------------------------------------------------------------------------------- //
-    //    if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
-    //    {
-    //        err_gyro_x = 10 * (angleSpeedX_set - gyroXArray_avge[10]);
-    //    }
-    //    else
-    //    {
-    //       err_gyro_x = 0;
-    //    }
-    //    duty_out_turn = err_gyro_x * 1;
-    //    duty_out_turn += (err_gyro_x - lastErr_Turn) * 1.5;
-    //
-    //    lastErr_Turn = err_gyro_x;
-    //
-    //    duty_out_turn = func_limit_ab(duty_out_turn, -1000, 1000);
+//    // yaw 轴 —— X 轴 角速度环 -------------------------------------------------------------------------------- //
+//    if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
+//    {
+//        err_gyro_x = 10 * (angleSpeedX_set - gyroXArray_avge[10]);
+//    }
+//    else
+//    {
+//       err_gyro_x = 0;
+//    }
+//    duty_out_turn = err_gyro_x * 1;
+//    duty_out_turn += (err_gyro_x - lastErr_Turn) * 1.5;
+//
+//    lastErr_Turn = err_gyro_x;
+//
+//    duty_out_turn = func_limit_ab(duty_out_turn, -1000, 1000);
 #else
 #endif
 
@@ -231,7 +232,7 @@ void balance( void )
 #if     angle2aSpeed
     // Z 方向偏航角 用 Y 方向角速度弥补 角度环 --------------------------------------------------------------------- //
 //        angle_z = 0;
-    if(func_abs(10 * (angleZ_set - 6 * angle_z)) > 5 * 6)
+    if(func_abs(10 * (angleZ_set - 6 * angle_z)) > 6)
     {
        err_acc_z = angleZ_set - angle_z;
     }
@@ -245,21 +246,21 @@ void balance( void )
         duty_out = 0;
         goto Dumping_protection;
     }
-    aSpeed_out_BALANCE_acc = err_acc_z * 2;//2.5;// 3
-    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1;
+    aSpeed_out_BALANCE_acc = err_acc_z * 2.5;//2.5;// 3
+    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1.25;
 
 //    if(func_abs(10 * err_acc_z) < 55)
 //    {
-       integError_z += err_acc_z * 0.12;
+       integError_z += err_acc_z * 0.15;
        aSpeed_out_BALANCE_acc += integError_z;
 //    }
 //    else
 //       integError_z *= 0.9;
 
-    integError_z = func_limit_ab(integError_z, -12, 12);
+    integError_z = func_limit_ab(integError_z, -15, 15);
     lastErr_acc = err_acc_z;
 
-    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -300 * 2, 300 * 2);
+    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -100, 100);
 
     angleSpeedY_set = - aSpeed_out_BALANCE_acc;
 
