@@ -141,7 +141,7 @@ static void debugOutput( void )
 {
 #if     CURVE_OUT
     numTest[2] = - gyroYArray_avge[10];
-    numTest[3] = aSpeed_out_BALANCE_acc *100 / 5500;
+    numTest[3] = aSpeed_out_BALANCE_acc *100 / 600;
     numTest[4] = duty_out * 100 / 8000;
     numTest[5] = duty_out_MAIN * 100 / 2000;
     numTest[6] = angle_y;
