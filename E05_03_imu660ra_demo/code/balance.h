@@ -23,15 +23,23 @@
 #define acc2out                         1
 #define aS2out                          1
 #define angle2aSpeed                    1
-#define Speed2angle                     0
+#define Speed2angle                     1
 
 // 有刷 无刷单独调试
 #define TURN_ENABLE                     1
-#define MAIN_ENABLE                     0
+#define MAIN_ENABLE                     1
 
 // 串口调试方式
 #define CURVE_OUT                       1
 #define CHARACTER_OUT                   0
+
+// 飞轮刹车
+#define LEF_STOP()    gpio_set_level(LEFT_FLYWHEEL_BRAKE, 0)
+#define RIG_STOP()    gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 0)
+
+// 飞轮刹车取消
+#define LEF_START()    gpio_set_level(LEFT_FLYWHEEL_BRAKE, 1)
+#define RIG_START()    gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 1)
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
