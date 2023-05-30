@@ -157,17 +157,17 @@ IFX_INTERRUPT(cc60_pit_ch0_isr, 0, CCU6_0_CH0_ISR_PRIORITY)
     realACC_z = imu660ra_acc_transition(imu660ra_acc_z);
 
     gyroXArray_avge[gyroXArray_avgeIndex++] = realGYRO_x;
-    gyroXArray_avgeIndex %= 10;
+    gyroXArray_avgeIndex %= countNum;
     accXArray_avge[accXArray_avgeIndex++] = realACC_x;
-    accXArray_avgeIndex %= 10;
+    accXArray_avgeIndex %= countNum;
     gyroYArray_avge[gyroYArray_avgeIndex++] = realGYRO_y;
-    gyroYArray_avgeIndex %= 10;
+    gyroYArray_avgeIndex %= countNum;
     accYArray_avge[accYArray_avgeIndex++] = realACC_y;
-    accYArray_avgeIndex %= 10;
+    accYArray_avgeIndex %= countNum;
     gyroZArray_avge[gyroZArray_avgeIndex++] = realGYRO_z;
-    gyroZArray_avgeIndex %= 10;
+    gyroZArray_avgeIndex %= countNum;
     accZArray_avge[accZArray_avgeIndex++] = realACC_z;
-    accZArray_avgeIndex %= 10;
+    accZArray_avgeIndex %= countNum;
 
     real_Speed_Lef  = encoder_get_count(LEFT_FLYWHEEL_ENCODER_INDEX);               // 获取左侧编码器值
     encoder_clear_count(LEFT_FLYWHEEL_ENCODER_INDEX);                               // 清除编码器计数 方便下次采集
