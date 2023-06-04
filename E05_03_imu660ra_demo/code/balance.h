@@ -30,16 +30,35 @@
 #define MAIN_ENABLE                     1
 
 // 串口调试方式
-#define CURVE_OUT                       1
-#define CHARACTER_OUT                   0
+#define CURVE_OUT                       0
+#define CHARACTER_OUT                   1
+
+// Gravity
+#define HHHT_Gravity                    0.97986f
+
+// IMU bias compensation
+#define GYROX_BIAS                     -0.0450f
+#define GYROY_BIAS                      0.3470f
+#define GYROZ_BIAS                     -0.1210f
+
+// 平均位数
+#define countNum                        10
+
+// 调试信息
+#define DATA1           gyroXArray_avge[10]//G2A_x
+#define DATA2           gyroYArray_avge[10]//G2A_y
+#define DATA3           gyroZArray_avge[10]//G2A_z
+#define DATA4           angle_x
+#define DATA5           angle_y
+#define DATA6           angle_z
 
 // 飞轮刹车
-#define LEF_STOP()    gpio_set_level(LEFT_FLYWHEEL_BRAKE, 0)
-#define RIG_STOP()    gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 0)
+#define LEF_STOP()      gpio_set_level(LEFT_FLYWHEEL_BRAKE, 0)
+#define RIG_STOP()      gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 0)
 
 // 飞轮刹车取消
-#define LEF_START()    gpio_set_level(LEFT_FLYWHEEL_BRAKE, 1)
-#define RIG_START()    gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 1)
+#define LEF_START()     gpio_set_level(LEFT_FLYWHEEL_BRAKE, 1)
+#define RIG_START()     gpio_set_level(RIGHT_FLYWHEEL_BRAKE, 1)
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/

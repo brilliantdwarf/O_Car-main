@@ -109,7 +109,7 @@ static int8 numTest[10] = {0x03, 0xFC, 0, 0, 0, 0, 0, 0, 0xFC, 0x03};
 static void dataAveraging( void )
 {
     // 陀螺仪取值平滑处理
-    for(int8 i = 0; i < 10; i++)
+    for(int8 i = 0; i < countNum; i++)
     {
         gyroXArray_avge[10] += gyroXArray_avge[i];
         accXArray_avge[10] += accXArray_avge[i];
@@ -118,12 +118,16 @@ static void dataAveraging( void )
         gyroZArray_avge[10] += gyroZArray_avge[i];
         accZArray_avge[10] += accZArray_avge[i];
     }
-    gyroXArray_avge[10] /= 10;
-    accXArray_avge[10] /= 10;
-    gyroYArray_avge[10] /= 10;
-    accYArray_avge[10] /= 10;
-    gyroZArray_avge[10] /= 10;
-    accZArray_avge[10] /= 10;
+    gyroXArray_avge[10] /= countNum;
+    accXArray_avge[10] /= countNum;
+    gyroYArray_avge[10] /= countNum;
+    accYArray_avge[10] /= countNum;
+    gyroZArray_avge[10] /= countNum;
+    accZArray_avge[10] /= countNum;
+
+//    gyroXArray_avge[10] -= GYROX_BIAS;
+//    gyroYArray_avge[10] -= GYROY_BIAS;
+//    gyroZArray_avge[10] -= GYROZ_BIAS;
 
     for(int8 i = 0; i < 5; i++)
     {
@@ -133,9 +137,9 @@ static void dataAveraging( void )
     SpeedLef_avge[5] /= 5;
     SpeedRig_avge[5] /= 5;
     // 根据重力加速度解算 Y Z 偏航角，以竖直状态为0
-    angle_x = (float)(asinf((float)(func_limit_ab(accXArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
-    angle_y = (float)(asinf((float)(func_limit_ab(accYArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
-    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / 0.98, -1.5, 1.5))) / 2 / PI * 360);
+    angle_x = (float)(asinf((float)(func_limit_ab(accXArray_avge[10] / HHHT_Gravity, -1.5, 1.5))) / 2 / PI * 360);
+    angle_y = (float)(asinf((float)(func_limit_ab(accYArray_avge[10] / HHHT_Gravity, -1.5, 1.5))) / 2 / PI * 360);
+    angle_z = (float)(asinf((float)(func_limit_ab(accZArray_avge[10] / HHHT_Gravity, -1.5, 1.5))) / 2 / PI * 360);
 //    angle_z = accZArray_avge[10] / 2 / PI * 360;
 
 }
@@ -146,15 +150,18 @@ static void dataAveraging( void )
  * 本函数用于调试各项数据，可将数值直接打印在屏幕上或者以曲线形式展现，在宏定义中可更改调试方式
  */
 
+int biasSumIndex;
+float avrBias[1001] = {0}, sumArry[1001] = {0};
+
 static void debugOutput( void )
 {
 #if     CURVE_OUT
-    numTest[2] = angle_x;
-    numTest[3] = angle_y;
-    numTest[4] = duty_out * 100 / 8000;
-    numTest[5] = angle_z;
-    numTest[6] = real_Speed_MAIN;
-    numTest[7] = angleY_set;
+    numTest[2] = DATA1;
+    numTest[3] = DATA2;
+    numTest[4] = DATA3;
+    numTest[5] = DATA4;
+    numTest[6] = DATA5;
+    numTest[7] = DATA6;
 
 //        printf("%c%c%c%c%c", 0x03, 0x0FC, numTest, 0x0FC, 0x03);
     uart_write_buffer(UART_0, numTest, 10);
@@ -166,10 +173,31 @@ static void debugOutput( void )
 //        printf("\r\n org IMU660RA gyro data: x=%.0f, y=%.0f, z=%.0f, duty=%d\r\n", 1000 * imu660ra_acc_transition(imu660ra_acc_x), 1000 * imu660ra_acc_transition(imu660ra_acc_y), 1000 * imu660ra_acc_transition(imu660ra_acc_z), duty_out);
 //    printf("\r\n  sum_Speed_Turn=%4.4f, z_s=%4.4f, Y_a=%4.4f, duty=%4.4f\r\n", sum_Speed_Turn, SpeedLef_avge[5], SpeedRig_avge[5], duty_out);
 //    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", angle_x, angle_y, angle_z);
+    sumArry[biasSumIndex] = DATA1;
+    biasSumIndex %= 1000;
+    for(int i = 0; i < 1000; i++)
+    {
+        sumArry[1000] += sumArry[i];
+    }
+    sumArry[1000] /= 1000;
 
-    printf("\r\n%4.4f\r\n", aSpeed_out_BALANCE_acc);
+    avrBias[biasSumIndex++] = sumArry[1000];
+    for(int i = 0; i < 1000; i++)
+    {
+        avrBias[1000] += avrBias[i];
+    }
+    avrBias[1000] /= 1000;
+//    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", DATA1, DATA2, DATA3);
+
+    printf("\r\n DATA4 biasAvrging = %2.12f %4d avrBias = %2.12f\r\n", sumArry[1000], biasSumIndex, avrBias[1000]);
+
+
+//    printf("\r\n%4.4f\r\n", aSpeed_out_BALANCE_acc);
 //        printf("\r\n real IMU660RA acc data:  x=%5d, y=%5d, z=%5d\r\n", imu660ra_acc_x,  imu660ra_acc_y,  imu660ra_acc_z);
 //        printf("\r\n real IMU660RA gyro data: x=%5d, y=%5d, z=%5d\r\n", imu660ra_gyro_x, imu660ra_gyro_y, imu660ra_gyro_z);
+//    printf("asin(alpha) = %2.4f, asin(beta) = %2.4f, asin(gamma) = %2.4f\r", DATA1, DATA2, DATA4);
+//
+//    printf("\r\n DATA4 biasAvrging = %4.8f %d\r\n", sumArry[1000], biasSumIndex);
 
 #endif
 }
@@ -188,7 +216,7 @@ void balance( void )
     // angle speed -----------------------------------------内环------------------------------------------------- //
 #if     aS2out
     // pitch 轴 —— Y 轴 角速度环 -------------------------------------------------------------------------------- //
-    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 1)
+    if(func_abs((int)(10 * (angleSpeedY_set - gyroYArray_avge[10]))) > 6)
     {
        err_gyro_y = 10 * (angleSpeedY_set - gyroYArray_avge[10]);
     }
@@ -197,8 +225,8 @@ void balance( void )
 //           duty_out_gyro *= 0.5;
        err_gyro_y = 0;
     }
-    duty_out_gyro = err_gyro_y * 30;//28;
-    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 10;                   // 正负决定瞬时对于kp是补偿还是削弱
+    duty_out_gyro = err_gyro_y * 28;//28;
+    duty_out_gyro += (err_gyro_y - lastErr_gyro) * 9;                   // 正负决定瞬时对于kp是补偿还是削弱
     lastErr_gyro = err_gyro_y;
     duty_out_gyro = func_limit_ab(duty_out_gyro, -8500, 8500);
 
@@ -212,11 +240,11 @@ void balance( void )
 //       duty_out_MAIN_gyro *= 0.4;
        err_gyro_z = 0;
     }
-    duty_out_MAIN_gyro = err_gyro_z * 2;//1.3;
-//    duty_out_MAIN_gyro -= (err_gyro_z - lastErr_M_gyro) * 2.5;//1.5;//0.7
+    duty_out_MAIN_gyro = err_gyro_z * 1;//1.3;
+    duty_out_MAIN_gyro += (err_gyro_z - lastErr_M_gyro) * 0.1;//2.5;//1.5;//0.7
     lastErr_M_gyro = err_gyro_z;
 
-    duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -3500, 3500);
+    duty_out_MAIN_gyro = func_limit_ab(duty_out_MAIN_gyro, -4500, 4500);
 
 //    // yaw 轴 —— X 轴 角速度环 -------------------------------------------------------------------------------- //
 //    if(func_abs((int)(10 * (angleSpeedX_set - gyroXArray_avge[10]))) > 8)
@@ -263,21 +291,21 @@ void balance( void )
         LEF_START();
         RIG_START();
     }
-    aSpeed_out_BALANCE_acc = err_acc_z * 2.8;//2.5;// 3
-    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1.25;
+    aSpeed_out_BALANCE_acc = err_acc_z * 2.5;//2.5;// 3
+    aSpeed_out_BALANCE_acc += (err_acc_z - lastErr_acc) * 1;//1.25;
 
 //    if(func_abs(10 * err_acc_z) < 55)
 //    {
-       integError_z += err_acc_z * 0.15;
+       integError_z += err_acc_z * 0.11;
        aSpeed_out_BALANCE_acc += integError_z;
 //    }
 //    else
 //       integError_z *= 0.9;
 
-    integError_z = func_limit_ab(integError_z, -15, 15);
+    integError_z = func_limit_ab(integError_z, -9, 9);
     lastErr_acc = err_acc_z;
 
-    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -100, 100);
+    aSpeed_out_BALANCE_acc = func_limit_ab(aSpeed_out_BALANCE_acc, -1000, 1000);
 
     angleSpeedY_set = - aSpeed_out_BALANCE_acc;
 
@@ -304,17 +332,17 @@ void balance( void )
         LEF_START();
         RIG_START();
     }
-    duty_out_MAIN_acc = err_acc_y * 12;// 5
-//        duty_out_MAIN_acc -= (err_acc_y - lastErr_M_acc) * 0.5;
+    duty_out_MAIN_acc = err_acc_y * 8;//8.5;// 5
+    duty_out_MAIN_acc += (err_acc_y - lastErr_M_acc) * 0.7;
 //    if(func_abs(10 * err_acc_y) < 55)
 //    {
-           integError_y += err_acc_y * 5;
+           integError_y += err_acc_y * 0.4;
            duty_out_MAIN_acc += integError_y;
 //    }
 //    else
 //       integError_y *= 0.9;
 
-    integError_y = func_limit_ab(integError_y, -50, 50);
+    integError_y = func_limit_ab(integError_y, -20, 20);
     lastErr_M_acc = err_acc_y;
     duty_out_MAIN_acc = func_limit_ab(duty_out_MAIN_acc, -200 * 10, 200 * 10);
     angleSpeedZ_set = + duty_out_MAIN_acc;
@@ -324,11 +352,11 @@ void balance( void )
 
     // speed to angle ---------------------------------------外外环------------------------------------------------- //
 #if     Speed2angle
-    sum_Speed_Lef = (Speed_Lef_set - SpeedLef_avge[5]) * func_abs(angle_z) * 0.062;//0.15;
-    sum_Speed_Rig = (Speed_Rig_set + SpeedRig_avge[5]) * func_abs(angle_z) * 0.062;//0.15;
+    sum_Speed_Lef = (Speed_Lef_set - SpeedLef_avge[5]) * func_abs(angle_z) * 0.043;//0.062;//0.15;
+    sum_Speed_Rig = (Speed_Rig_set + SpeedRig_avge[5]) * func_abs(angle_z) * 0.043;//0.062;//0.15;
     sum_Speed_Turn = (sum_Speed_Lef + sum_Speed_Rig) / 2;
-    sum_Speed_Turn = func_limit_ab(sum_Speed_Turn, -45, 45);
-    sum_Speed_MAIN = (Speed_MAIN_set + real_Speed_MAIN) * 0.01;
+    sum_Speed_Turn = func_limit_ab(sum_Speed_Turn, -50, 50);
+    sum_Speed_MAIN = (Speed_MAIN_set + real_Speed_MAIN) * 0.04;
 
 #else
 #endif
@@ -395,12 +423,12 @@ void balance( void )
     if(duty_out_MAIN >= 0)                                                          // 正转
     {
         gpio_set_level(POWER_MOTOR_DIR, GPIO_HIGH);                                 // DIR输出高电平
-        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);               // 计算占空比
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN));               // 计算占空比
     }
     else                                                                            // 反转
     {
         gpio_set_level(POWER_MOTOR_DIR, GPIO_LOW);                                  // DIR输出低电平
-        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN) + 200);               // 计算占空比
+        pwm_set_duty(POWER_MOTOR_PWM, func_abs(duty_out_MAIN));               // 计算占空比
     }
 
     // 调试串口输出

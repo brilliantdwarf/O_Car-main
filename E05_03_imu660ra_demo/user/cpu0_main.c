@@ -81,47 +81,11 @@
 
 float realGYRO_x    = 0, realGYRO_y     = 0, realGYRO_z     = 0;
 float realACC_x     = 0, realACC_y      = 0, realACC_z      = 0;
+float G2A_x         = 0, G2A_y          = 0, G2A_z          = 0;
 
 int core0_main(void)
 {
-    clock_init();                   // 获取时钟频率<务必保留>
-    debug_init();                   // 初始化默认调试串口
-    // 此处编写用户代码 例如外设初始化代码等
-
-    gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);                             // 初始化 LED1 输出 默认高电平 推挽输出模式
-    gpio_init(LED2, GPO, GPIO_HIGH, GPO_PUSH_PULL);                             // 初始化 LED2 输出 默认高电平 推挽输出模式
-
-    // PWM 有刷电机初始化
-    gpio_init(POWER_MOTOR_DIR, GPO, GPIO_HIGH, GPO_PUSH_PULL);                  // GPIO 初始化为输出 默认上拉输出高
-    pwm_init (POWER_MOTOR_PWM, 17000, 0);                                       // PWM 通道初始化频率 17KHz 占空比初始为 0
-    encoder_quad_init(ENCODER_QUADDEC, ENCODER_QUADDEC_A, ENCODER_QUADDEC_B);   // 初始化编码器模块与引脚 正交解码编码器模式
-
-
-    // PWM 无刷电机初始化
-    pwm_init (LEFT_FLYWHEEL_PWM, 17000, LEFT_FLYWHEEL_DUTY_LEVEL == 0 ? PWM_DUTY_MAX : 0);                  // 初始化左侧飞轮PWM信号
-    gpio_init(LEFT_FLYWHEEL_DIR, GPO, LEFT_FLYWHEEL_CLOCKWISE, GPO_PUSH_PULL);                              // 初始化左侧飞轮DIR信号
-    gpio_init(LEFT_FLYWHEEL_BRAKE, GPO, 1, GPO_PUSH_PULL);                                                  // 初始化左侧飞轮刹车信号
-    encoder_quad_init(LEFT_FLYWHEEL_ENCODER_INDEX, LEFT_FLYWHEEL_ENCODER_CH1, LEFT_FLYWHEEL_ENCODER_CH2);   // 初始化左侧飞轮编码器接口
-
-    pwm_init (RIGHT_FLYWHEEL_PWM, 17000, RIGHT_FLYWHEEL_DUTY_LEVEL == 0 ? PWM_DUTY_MAX : 0);                // 初始化右侧飞轮PWM信号
-    gpio_init(RIGHT_FLYWHEEL_DIR, GPO, RIGHT_FLYWHEEL_CLOCKWISE, GPO_PUSH_PULL);                            // 初始化右侧飞轮DIR信号
-    gpio_init(RIGHT_FLYWHEEL_BRAKE, GPO, 1, GPO_PUSH_PULL);                                                 // 初始化右侧飞轮刹车信号
-    encoder_quad_init(RIGHT_FLYWHEEL_ENCODER_INDEX, RIGHT_FLYWHEEL_ENCODER_CH1, RIGHT_FLYWHEEL_ENCODER_CH2);// 初始化右侧飞轮编码器接口
-
-//    static int16 maxAcc_y = 0;
-//    static int16 err_acc_x = 0;
-//    static int16 err_gyro_x = 0;
-
-
-    while(1)
-    {
-       if(imu660ra_init())
-           printf("\r\n IMU660RA init error.");                                 // IMU660RA 初始化失败
-       else
-           break;
-       gpio_toggle_level(LED1);                                                 // 翻转 LED 引脚输出电平 控制 LED 亮灭 初始化出错这个灯会闪的很慢
-    }
-    pit_ms_init(CCU60_CH0, 5);
+    InitAll();
 
     // 此处编写用户代码 例如外设初始化代码等
     cpu_wait_event_ready();         // 等待所有核心初始化完毕
@@ -157,17 +121,17 @@ IFX_INTERRUPT(cc60_pit_ch0_isr, 0, CCU6_0_CH0_ISR_PRIORITY)
     realACC_z = imu660ra_acc_transition(imu660ra_acc_z);
 
     gyroXArray_avge[gyroXArray_avgeIndex++] = realGYRO_x;
-    gyroXArray_avgeIndex %= 10;
+    gyroXArray_avgeIndex %= countNum;
     accXArray_avge[accXArray_avgeIndex++] = realACC_x;
-    accXArray_avgeIndex %= 10;
+    accXArray_avgeIndex %= countNum;
     gyroYArray_avge[gyroYArray_avgeIndex++] = realGYRO_y;
-    gyroYArray_avgeIndex %= 10;
+    gyroYArray_avgeIndex %= countNum;
     accYArray_avge[accYArray_avgeIndex++] = realACC_y;
-    accYArray_avgeIndex %= 10;
+    accYArray_avgeIndex %= countNum;
     gyroZArray_avge[gyroZArray_avgeIndex++] = realGYRO_z;
-    gyroZArray_avgeIndex %= 10;
+    gyroZArray_avgeIndex %= countNum;
     accZArray_avge[accZArray_avgeIndex++] = realACC_z;
-    accZArray_avgeIndex %= 10;
+    accZArray_avgeIndex %= countNum;
 
     real_Speed_Lef  = encoder_get_count(LEFT_FLYWHEEL_ENCODER_INDEX);               // 获取左侧编码器值
     encoder_clear_count(LEFT_FLYWHEEL_ENCODER_INDEX);                               // 清除编码器计数 方便下次采集
@@ -180,6 +144,10 @@ IFX_INTERRUPT(cc60_pit_ch0_isr, 0, CCU6_0_CH0_ISR_PRIORITY)
     SpeedLef_avgeIndex %= 5;
     SpeedRig_avge[SpeedRig_avgeIndex++] = real_Speed_Rig;
     SpeedRig_avgeIndex %= 5;
+
+    G2A_x -= (realGYRO_x - GYROX_BIAS) * SAMPLING_PERIOD / 1000 * 1;
+    G2A_y -= (realGYRO_y - GYROY_BIAS) * SAMPLING_PERIOD / 1000 * 1;
+    G2A_z += (realGYRO_z - GYROZ_BIAS) * SAMPLING_PERIOD / 1000 * 1;
 }
 
 #pragma section all restore
